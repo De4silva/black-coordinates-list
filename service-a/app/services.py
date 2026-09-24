@@ -27,3 +27,23 @@ class IPGeolocationService:
             "city": data.get("cityName"),
             "isp": data.get("asnOrganization"),
         }
+
+
+class CoordinateServiceClient:
+    BASE_URL = "http://127.0.0.1:5000"
+
+    def __init__(self, timeout: float = 10.0):
+        self.timeout = timeout
+
+    def create_coordinate(self, coordinate_data: dict) -> dict:
+        url = f"{self.BASE_URL}/api/coordinates"
+
+        response = httpx.post(
+            url,
+            json=coordinate_data,
+            timeout=self.timeout,
+        )
+
+        response.raise_for_status()
+
+        return response.json()
