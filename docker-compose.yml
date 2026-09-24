@@ -1,0 +1,20 @@
+services:
+  service-a:
+    build: ./service-a
+    ports: ["8000:8000"]
+    environment:
+      SERVICE_B_URL: http://service-b:5000
+      SERVICE_C_URL: http://service-c:8001
+    depends_on: [service-b, service-c]
+
+  service-b:
+    build: ./service-b
+    ports: ["5000:5000"]
+    volumes: [service-b-data:/app/instance]
+
+  service-c:
+    build: ./service-c
+    ports: ["8001:8001"]
+
+volumes:
+  service-b-data:

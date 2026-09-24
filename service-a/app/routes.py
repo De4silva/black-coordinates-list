@@ -1,7 +1,7 @@
 import httpx
 from fastapi import APIRouter, HTTPException
 
-from app.schemas import IPRequest
+from app.schemas import IPRequest, IPListRequest
 from app.services import IPGeolocationService, CoordinateServiceClient
 
 
@@ -17,27 +17,48 @@ def health_check():
         "status": "ok",
         "service": "service-a",
     }
+def resolve_and_save(ip_address: str):
+    location = geolocation_service.resolve_ip(ip_address)
 
+    coordinate = {
+        "ip": location["ip"],
+        "latitude": location["latitude"],
+        "longitude": location["longitude"],
+        "country": location["country"],
+        "city": location["city"],
+    }
+
+    saved = coordinate_service.create_coordinate(coordinate)
+
+    return {
+        "location": location,
+        "saved_coordinate": saved,
+    }
 
 @router.post("/resolve-ip")
 def resolve_ip(request: IPRequest):
     try:
-        location_data = geolocation_service.resolve_ip(str(request.ip))
+        return resolve_and_save(str(request.ip))
 
-        coordinate_data = {
-            "ip": location_data["ip"],
-            "latitude": location_data["latitude"],
-            "longitude": location_data["longitude"],
-            "country": location_data["country"],
-            "city": location_data["city"],
-        }
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Upstream service returned an error",
+        ) from exc
 
-        saved_coordinate = coordinate_service.create_coordinate(coordinate_data)
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Upstream service is unavailable",
+        ) from exc
 
-        return {
-            "location": location_data,
-            "saved_coordinate": saved_coordinate,
-        }
+@router.post("/resolve-ip-list")
+def resolve_ip_list(request: IPListRequest):
+    try:
+        return [
+            resolve_and_save(str(ip_address))
+            for ip_address in request.ips
+        ]
 
     except httpx.HTTPStatusError as exc:
         raise HTTPException(
