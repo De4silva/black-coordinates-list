@@ -5,6 +5,7 @@ from flask import Flask
 from app.database import db
 from app.models import Coordinate
 from app.routes import coordinates_bp
+from app.users import UserStore, users_bp
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,6 +22,8 @@ def create_app():
 
     db.init_app(app)
     app.register_blueprint(coordinates_bp)
+    app.extensions['users'] = UserStore()
+    app.register_blueprint(users_bp)
 
     with app.app_context():
         db.create_all()
