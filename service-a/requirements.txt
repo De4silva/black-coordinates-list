@@ -1,3 +1,5 @@
 fastapi
 uvicorn[standard]
 httpx
+email-validator
+kafka-python==2.2.15

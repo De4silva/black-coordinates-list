@@ -1,7 +1,9 @@
 import httpx
 from fastapi import APIRouter, HTTPException
 
-from app.schemas import IPRequest, IPListRequest
+from app.schemas import IPRequest, IPListRequest, SigninRequest
+from app.user_gateway import DuplicateIP, user_gateway
+from kafka.errors import KafkaError
 from app.services import IPGeolocationService, CoordinateServiceClient
 
 
@@ -9,6 +11,17 @@ router = APIRouter()
 
 geolocation_service = IPGeolocationService()
 coordinate_service = CoordinateServiceClient()
+
+
+@router.post('/signin', status_code=202)
+def signin(request: SigninRequest):
+    try:
+        user_gateway.publish(str(request.email), str(request.ip))
+    except DuplicateIP as exc:
+        raise HTTPException(status_code=429, detail='IP already submitted within 60 seconds') from exc
+    except KafkaError as exc:
+        raise HTTPException(status_code=503, detail='Kafka is unavailable') from exc
+    return {'message': 'your request was received'}
 
 
 @router.get("/health")

@@ -5,7 +5,15 @@ services:
     environment:
       SERVICE_B_URL: http://service-b:5000
       SERVICE_C_URL: http://service-c:8001
-    depends_on: [service-b, service-c]
+      KAFKA_BOOTSTRAP_SERVERS: kafka-broker:9092
+      KAFKA_TOPIC: user-gateway
+    depends_on:
+      service-b:
+        condition: service_started
+      service-c:
+        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
 
   service-b:
     build: ./service-b
@@ -16,5 +24,52 @@ services:
     build: ./service-c
     ports: ["8001:8001"]
 
+  kafka-broker:
+    image: apache/kafka:4.3.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-broker:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes: [kafka-data:/var/lib/kafka/data]
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "kafka-broker:9092", "--list"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  kafka-init:
+    image: apache/kafka:4.3.1
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+    entrypoint: ["/opt/kafka/bin/kafka-topics.sh"]
+    command: ["--bootstrap-server", "kafka-broker:9092", "--create", "--if-not-exists", "--topic", "user-gateway", "--partitions", "1", "--replication-factor", "1"]
+
+  kafka-consumer:
+    build: ./kafka-consumer
+    restart: on-failure
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka-broker:9092
+      KAFKA_TOPIC: user-gateway
+      KAFKA_GROUP_ID: user-gateway-group
+      SERVICE_B_URL: http://service-b:5000
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      service-b:
+        condition: service_started
+
 volumes:
   service-b-data:
+  kafka-data:

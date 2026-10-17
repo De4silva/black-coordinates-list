@@ -1,4 +1,4 @@
-from pydantic import BaseModel, IPvAnyAddress
+from pydantic import BaseModel, EmailStr, IPvAnyAddress
 
 
 class IPRequest(BaseModel):
@@ -7,3 +7,9 @@ class IPRequest(BaseModel):
 
 class IPListRequest(BaseModel):
     ips: list[IPvAnyAddress]
+
+
+class SigninRequest(BaseModel):
+    email: EmailStr
+    password: str | None = None
+    ip: IPvAnyAddress
